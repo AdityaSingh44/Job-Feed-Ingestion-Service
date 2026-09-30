@@ -1,0 +1,6 @@
+{
+  "name": "Reliable Job-Feed Ingestion Service",
+  "description": "Production-grade asynchronous job-feed ingestion service with durable acceptance, replay safety, out-of-order versioning, competing workers, and resilient fault tolerance.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

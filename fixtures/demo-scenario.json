@@ -1,0 +1,429 @@
+{
+  "description": "Comprehensive 20-request scenario verifying validation, replays, conflicts, tenant/source collisions, out-of-order versions, archives, provider retries, and failure exhaustion.",
+  "phase1": [
+    {
+      "id": "req-01",
+      "description": "Valid upsert alpha v1",
+      "expectedStatus": 202,
+      "event": {
+        "tenantId": "tenant-a",
+        "sourceId": "main",
+        "eventId": "event-alpha-v1",
+        "externalJobId": "alpha",
+        "version": 1,
+        "operation": "upsert",
+        "payload": {
+          "title": "Full Stack Developer",
+          "company": "Example Labs",
+          "location": "Surat",
+          "experienceMin": 1,
+          "experienceMax": 3,
+          "applyUrl": "https://example.test/jobs/alpha",
+          "skills": [" TypeScript ", "MongoDB", "typescript"]
+        }
+      }
+    },
+    {
+      "id": "req-02",
+      "description": "Replay safety: Exact duplicate of req-01",
+      "expectedStatus": 200,
+      "event": {
+        "tenantId": "tenant-a",
+        "sourceId": "main",
+        "eventId": "event-alpha-v1",
+        "externalJobId": "alpha",
+        "version": 1,
+        "operation": "upsert",
+        "payload": {
+          "company": "Example Labs",
+          "title": "Full Stack Developer",
+          "location": "Surat",
+          "experienceMin": 1,
+          "experienceMax": 3,
+          "applyUrl": "https://example.test/jobs/alpha",
+          "skills": [" TypeScript ", "MongoDB", "typescript"]
+        }
+      }
+    },
+    {
+      "id": "req-03",
+      "description": "Conflict: Reusing event-alpha-v1 with different content",
+      "expectedStatus": 409,
+      "event": {
+        "tenantId": "tenant-a",
+        "sourceId": "main",
+        "eventId": "event-alpha-v1",
+        "externalJobId": "alpha",
+        "version": 1,
+        "operation": "upsert",
+        "payload": {
+          "title": "Conflicting Senior Architect",
+          "company": "Example Labs",
+          "location": "Surat",
+          "experienceMin": 5,
+          "experienceMax": 10,
+          "applyUrl": "https://example.test/jobs/alpha",
+          "skills": ["TypeScript"]
+        }
+      }
+    },
+    {
+      "id": "req-04",
+      "description": "Validation failure: Surrounding whitespace in tenantId",
+      "expectedStatus": 400,
+      "event": {
+        "tenantId": " tenant-a ",
+        "sourceId": "main",
+        "eventId": "event-rejected-01",
+        "externalJobId": "job-bad-tenant",
+        "version": 1,
+        "operation": "upsert",
+        "payload": {
+          "title": "Backend Engineer",
+          "company": "Example Labs",
+          "location": "Bengaluru",
+          "experienceMin": 2,
+          "experienceMax": 4,
+          "applyUrl": "https://example.test/jobs/bad-tenant",
+          "skills": ["Node.js"]
+        }
+      }
+    },
+    {
+      "id": "req-05",
+      "description": "Corrected reuse of rejected eventId from req-04",
+      "expectedStatus": 202,
+      "event": {
+        "tenantId": "tenant-a",
+        "sourceId": "main",
+        "eventId": "event-rejected-01",
+        "externalJobId": "job-bad-tenant",
+        "version": 1,
+        "operation": "upsert",
+        "payload": {
+          "title": "Backend Engineer",
+          "company": "Example Labs",
+          "location": "Bengaluru",
+          "experienceMin": 2,
+          "experienceMax": 4,
+          "applyUrl": "https://example.test/jobs/bad-tenant",
+          "skills": ["Node.js"]
+        }
+      }
+    },
+    {
+      "id": "req-06",
+      "description": "Validation failure: Zero version (must be positive integer)",
+      "expectedStatus": 400,
+      "event": {
+        "tenantId": "tenant-a",
+        "sourceId": "main",
+        "eventId": "event-bad-version",
+        "externalJobId": "job-zero-ver",
+        "version": 0,
+        "operation": "upsert",
+        "payload": {
+          "title": "DevOps Engineer",
+          "company": "Example Labs",
+          "location": "Remote",
+          "experienceMin": 1,
+          "experienceMax": 3,
+          "applyUrl": "https://example.test/jobs/devops",
+          "skills": ["Docker"]
+        }
+      }
+    },
+    {
+      "id": "req-07",
+      "description": "Validation failure: experienceMin greater than experienceMax",
+      "expectedStatus": 400,
+      "event": {
+        "tenantId": "tenant-a",
+        "sourceId": "main",
+        "eventId": "event-bad-exp",
+        "externalJobId": "job-bad-exp",
+        "version": 1,
+        "operation": "upsert",
+        "payload": {
+          "title": "QA Lead",
+          "company": "Example Labs",
+          "location": "Pune",
+          "experienceMin": 8,
+          "experienceMax": 3,
+          "applyUrl": "https://example.test/jobs/qa",
+          "skills": ["Selenium"]
+        }
+      }
+    },
+    {
+      "id": "req-08",
+      "description": "Validation failure: Insecure HTTP URL (must use HTTPS)",
+      "expectedStatus": 400,
+      "event": {
+        "tenantId": "tenant-a",
+        "sourceId": "main",
+        "eventId": "event-bad-url",
+        "externalJobId": "job-insecure",
+        "version": 1,
+        "operation": "upsert",
+        "payload": {
+          "title": "Security Analyst",
+          "company": "Example Labs",
+          "location": "Delhi",
+          "experienceMin": 1,
+          "experienceMax": 2,
+          "applyUrl": "http://insecure.test/jobs/security",
+          "skills": ["Security"]
+        }
+      }
+    },
+    {
+      "id": "req-09",
+      "description": "Tenant isolation: Same externalJobId and eventId under tenant-b",
+      "expectedStatus": 202,
+      "event": {
+        "tenantId": "tenant-b",
+        "sourceId": "main",
+        "eventId": "event-alpha-v1",
+        "externalJobId": "alpha",
+        "version": 1,
+        "operation": "upsert",
+        "payload": {
+          "title": "Tenant B Staff Engineer",
+          "company": "Tenant B Corp",
+          "location": "Mumbai",
+          "experienceMin": 5,
+          "experienceMax": 8,
+          "applyUrl": "https://tenant-b.test/jobs/alpha",
+          "skills": ["Go", "Kubernetes"]
+        }
+      }
+    },
+    {
+      "id": "req-10",
+      "description": "Source isolation: Same tenant-a and externalJobId alpha under partner source",
+      "expectedStatus": 202,
+      "event": {
+        "tenantId": "tenant-a",
+        "sourceId": "partner",
+        "eventId": "event-alpha-partner-v1",
+        "externalJobId": "alpha",
+        "version": 1,
+        "operation": "upsert",
+        "payload": {
+          "title": "Partner Sourced Alpha",
+          "company": "Partner Agency",
+          "location": "Hyderabad",
+          "experienceMin": 2,
+          "experienceMax": 5,
+          "applyUrl": "https://partner.test/jobs/alpha",
+          "skills": ["Python"]
+        }
+      }
+    },
+    {
+      "id": "req-11",
+      "description": "Out-of-order versioning: Job beta v3 arrives before v2",
+      "expectedStatus": 202,
+      "event": {
+        "tenantId": "tenant-a",
+        "sourceId": "main",
+        "eventId": "event-beta-v3",
+        "externalJobId": "beta",
+        "version": 3,
+        "operation": "upsert",
+        "payload": {
+          "title": "Principal Architect V3",
+          "company": "Example Labs",
+          "location": "Surat",
+          "experienceMin": 7,
+          "experienceMax": 12,
+          "applyUrl": "https://example.test/jobs/beta-v3",
+          "skills": ["Distributed Systems", "MongoDB"]
+        }
+      }
+    },
+    {
+      "id": "req-12",
+      "description": "Delayed stale update: Job beta v2 arrives after v3 (should skip as stale)",
+      "expectedStatus": 202,
+      "event": {
+        "tenantId": "tenant-a",
+        "sourceId": "main",
+        "eventId": "event-beta-v2",
+        "externalJobId": "beta",
+        "version": 2,
+        "operation": "upsert",
+        "payload": {
+          "title": "Senior Architect V2 (Stale)",
+          "company": "Example Labs",
+          "location": "Surat",
+          "experienceMin": 5,
+          "experienceMax": 9,
+          "applyUrl": "https://example.test/jobs/beta-v2",
+          "skills": ["MongoDB"]
+        }
+      }
+    },
+    {
+      "id": "req-13",
+      "description": "Archive before upsert: Job gamma v2 archive arrives before any upsert",
+      "expectedStatus": 202,
+      "event": {
+        "tenantId": "tenant-a",
+        "sourceId": "main",
+        "eventId": "event-gamma-v2-archive",
+        "externalJobId": "gamma",
+        "version": 2,
+        "operation": "archive"
+      }
+    },
+    {
+      "id": "req-14",
+      "description": "Delayed upsert for gamma: v1 upsert arrives after v2 archive (must NOT resurrect job)",
+      "expectedStatus": 202,
+      "event": {
+        "tenantId": "tenant-a",
+        "sourceId": "main",
+        "eventId": "event-gamma-v1",
+        "externalJobId": "gamma",
+        "version": 1,
+        "operation": "upsert",
+        "payload": {
+          "title": "Old Gamma Engineer V1 (Stale)",
+          "company": "Example Labs",
+          "location": "Surat",
+          "experienceMin": 1,
+          "experienceMax": 2,
+          "applyUrl": "https://example.test/jobs/gamma-v1",
+          "skills": ["React"]
+        }
+      }
+    },
+    {
+      "id": "req-15",
+      "description": "Provider failure with retry success: delta v1 fails attempt 1 (503), succeeds attempt 2",
+      "expectedStatus": 202,
+      "event": {
+        "tenantId": "tenant-a",
+        "sourceId": "main",
+        "eventId": "event-delta-v1",
+        "externalJobId": "delta",
+        "version": 1,
+        "operation": "upsert",
+        "payload": {
+          "title": "Resilient Data Engineer",
+          "company": "Example Labs",
+          "location": "Bengaluru",
+          "experienceMin": 3,
+          "experienceMax": 6,
+          "applyUrl": "https://example.test/jobs/delta",
+          "skills": ["Kafka", "Spark", "MongoDB"]
+        }
+      }
+    },
+    {
+      "id": "req-16",
+      "description": "Provider permanent failure 422: epsilon v1 rejected permanently without retry",
+      "expectedStatus": 202,
+      "event": {
+        "tenantId": "tenant-a",
+        "sourceId": "main",
+        "eventId": "event-epsilon-v1",
+        "externalJobId": "epsilon",
+        "version": 1,
+        "operation": "upsert",
+        "payload": {
+          "title": "Flagged Discriminatory Post",
+          "company": "Unverified Shell Corp",
+          "location": "Unknown",
+          "experienceMin": 0,
+          "experienceMax": 1,
+          "applyUrl": "https://example.test/jobs/epsilon",
+          "skills": ["Spam"]
+        }
+      }
+    },
+    {
+      "id": "req-17",
+      "description": "Provider retry exhaustion: zeta v1 receives 429 across 3 attempts, ending in terminal failed",
+      "expectedStatus": 202,
+      "event": {
+        "tenantId": "tenant-a",
+        "sourceId": "main",
+        "eventId": "event-zeta-v1",
+        "externalJobId": "zeta",
+        "version": 1,
+        "operation": "upsert",
+        "payload": {
+          "title": "Rate Limited Feed Job",
+          "company": "Example Labs",
+          "location": "Surat",
+          "experienceMin": 1,
+          "experienceMax": 3,
+          "applyUrl": "https://example.test/jobs/zeta",
+          "skills": ["GraphQL"]
+        }
+      }
+    }
+  ],
+  "phase2": [
+    {
+      "id": "req-18",
+      "description": "Archive reactivation: Job gamma v3 upsert arrives after v2 archive, reactivating the job",
+      "expectedStatus": 202,
+      "event": {
+        "tenantId": "tenant-a",
+        "sourceId": "main",
+        "eventId": "event-gamma-v3-upsert",
+        "externalJobId": "gamma",
+        "version": 3,
+        "operation": "upsert",
+        "payload": {
+          "title": "Reactivated Senior Gamma Engineer V3",
+          "company": "Example Labs",
+          "location": "Surat",
+          "experienceMin": 4,
+          "experienceMax": 7,
+          "applyUrl": "https://example.test/jobs/gamma-v3",
+          "skills": ["React", "TypeScript", "Node.js"]
+        }
+      }
+    },
+    {
+      "id": "req-19",
+      "description": "Standard version advance: alpha v2 upsert updates alpha from v1 to v2",
+      "expectedStatus": 202,
+      "event": {
+        "tenantId": "tenant-a",
+        "sourceId": "main",
+        "eventId": "event-alpha-v2",
+        "externalJobId": "alpha",
+        "version": 2,
+        "operation": "upsert",
+        "payload": {
+          "title": "Lead Full Stack Developer V2",
+          "company": "Example Labs",
+          "location": "Surat",
+          "experienceMin": 2,
+          "experienceMax": 5,
+          "applyUrl": "https://example.test/jobs/alpha-v2",
+          "skills": ["TypeScript", "MongoDB", "Express"]
+        }
+      }
+    },
+    {
+      "id": "req-20",
+      "description": "Stale archive: alpha v1 archive arrives after v2 upsert (should be ignored as stale)",
+      "expectedStatus": 202,
+      "event": {
+        "tenantId": "tenant-a",
+        "sourceId": "main",
+        "eventId": "event-alpha-v1-archive",
+        "externalJobId": "alpha",
+        "version": 1,
+        "operation": "archive"
+      }
+    }
+  ]
+}

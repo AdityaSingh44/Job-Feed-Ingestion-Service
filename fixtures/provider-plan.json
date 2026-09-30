@@ -1,0 +1,44 @@
+[
+  {
+    "description": "Delta job transient 503 failure on first attempt, then succeeds on retry",
+    "match": {
+      "externalJobId": "delta",
+      "attempt": 1
+    },
+    "result": {
+      "status": 503,
+      "message": "External verification service temporarily unavailable (503 Service Unavailable)"
+    }
+  },
+  {
+    "description": "Delta job succeeds on attempt 2 and above",
+    "match": {
+      "externalJobId": "delta",
+      "attempt": 2
+    },
+    "result": {
+      "status": 200,
+      "message": "External verification verified successfully"
+    }
+  },
+  {
+    "description": "Epsilon job permanent verification failure 422 (unprocessable listing content)",
+    "match": {
+      "externalJobId": "epsilon"
+    },
+    "result": {
+      "status": 422,
+      "message": "External verification rejected job content: discriminatory or unverified employer listing (422 Unprocessable Entity)"
+    }
+  },
+  {
+    "description": "Zeta job persistent rate limit 429 causing retry exhaustion across all 3 attempts",
+    "match": {
+      "externalJobId": "zeta"
+    },
+    "result": {
+      "status": 429,
+      "message": "External verification provider rate limit exceeded (429 Too Many Requests)"
+    }
+  }
+]
